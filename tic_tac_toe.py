@@ -1,145 +1,192 @@
-import pygame
-import sys
-import numpy as np
+"""A tic-tac-toe game built with Python and Tkinter."""
 
-# Constants
-WIDTH, HEIGHT = 300, 300
-LINE_WIDTH = 15
-BOARD_ROWS, BOARD_COLS = 3, 3
-SQUARE_SIZE = WIDTH // BOARD_COLS
-CIRCLE_RADIUS = SQUARE_SIZE // 3
-CROSS_WIDTH = 25
-SPACE = 15
+import tkinter as tk
+from itertools import cycle
+from tkinter import font
+from typing import NamedTuple
 
-# Colors
-BG_COLOR = (28, 170, 156)
-LINE_COLOR = (23, 145, 135)
-CIRCLE_COLOR = (239, 231, 200)
-CROSS_COLOR = (66, 66, 66)
+class Player(NamedTuple):
+    label: str
+    color: str
 
-# Initialize the game
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Tic Tac Toe")
-screen.fill(BG_COLOR)
+class Move(NamedTuple):
+    row: int
+    col: int
+    label: str = ""
 
-# Create the board
-board = np.zeros((BOARD_ROWS, BOARD_COLS))
+BOARD_SIZE = 3
+DEFAULT_PLAYERS = (
+    Player(label="X", color="blue"),
+    Player(label="O", color="green"),
+)
 
-def draw_lines():
-    # Horizontal lines
-    pygame.draw.line(screen, LINE_COLOR, (0, SQUARE_SIZE), (WIDTH, SQUARE_SIZE), LINE_WIDTH)
-    pygame.draw.line(screen, LINE_COLOR, (0, 2 * SQUARE_SIZE), (WIDTH, 2 * SQUARE_SIZE), LINE_WIDTH)
-    # Vertical lines
-    pygame.draw.line(screen, LINE_COLOR, (SQUARE_SIZE, 0), (SQUARE_SIZE, HEIGHT), LINE_WIDTH)
-    pygame.draw.line(screen, LINE_COLOR, (2 * SQUARE_SIZE, 0), (2 * SQUARE_SIZE, HEIGHT), LINE_WIDTH)
+class TicTacToeGame:
+    def __init__(self, players=DEFAULT_PLAYERS, board_size=BOARD_SIZE):
+        self._players = cycle(players)
+        self.board_size = board_size
+        self.current_player = next(self._players)
+        self.winner_combo = []
+        self._current_moves = []
+        self._has_winner = False
+        self._winning_combos = []
+        self._setup_board()
 
-def draw_figures():
-    for row in range(BOARD_ROWS):
-        for col in range(BOARD_COLS):
-            if board[row][col] == 1:
-                pygame.draw.circle(screen, CIRCLE_COLOR, 
-                                   (int(col * SQUARE_SIZE + SQUARE_SIZE // 2), 
-                                    int(row * SQUARE_SIZE + SQUARE_SIZE // 2)), 
-                                   CIRCLE_RADIUS)
-            elif board[row][col] == 2:
-                pygame.draw.line(screen, CROSS_COLOR, 
-                                 (col * SQUARE_SIZE + SPACE, row * SQUARE_SIZE + SQUARE_SIZE - SPACE), 
-                                 (col * SQUARE_SIZE + SQUARE_SIZE - SPACE, row * SQUARE_SIZE + SPACE), 
-                                 CROSS_WIDTH)
-                pygame.draw.line(screen, CROSS_COLOR, 
-                                 (col * SQUARE_SIZE + SPACE, row * SQUARE_SIZE + SPACE), 
-                                 (col * SQUARE_SIZE + SQUARE_SIZE - SPACE, row * SQUARE_SIZE + SQUARE_SIZE - SPACE), 
-                                 CROSS_WIDTH)
+    def _setup_board(self):
+        self._current_moves = [
+            [Move(row, col) for col in range(self.board_size)]
+            for row in range(self.board_size)
+        ]
+        self._winning_combos = self._get_winning_combos()
 
-def mark_square(row, col, player):
-    board[row][col] = player
+    def _get_winning_combos(self):
+        rows = [
+            [(move.row, move.col) for move in row]
+            for row in self._current_moves
+        ]
+        columns = [list(col) for col in zip(*rows)]
+        first_diagonal = [row[i] for i, row in enumerate(rows)]
+        second_diagonal = [col[j] for j, col in enumerate(reversed(columns))]
+        return rows + columns + [first_diagonal, second_diagonal]
 
-def available_square(row, col):
-    return board[row][col] == 0
+    def toggle_player(self):
+        """Return a toggled player."""
+        self.current_player = next(self._players)
 
-def is_board_full():
-    return np.all(board != 0)
+    def is_valid_move(self, move):
+        """Return True if move is valid, and False otherwise."""
+        row, col = move.row, move.col
+        move_was_not_played = self._current_moves[row][col].label == ""
+        no_winner = not self._has_winner
+        return no_winner and move_was_not_played
 
-def check_win(player):
-    # Check horizontal, vertical and diagonal
-    for col in range(BOARD_COLS):
-        if np.all(board[:, col] == player):
-            return True
-    for row in range(BOARD_ROWS):
-        if np.all(board[row, :] == player):
-            return True
-    if np.all(np.diag(board) == player) or np.all(np.diag(np.fliplr(board)) == player):
-        return True
-    return False
+    def process_move(self, move):
+        """Process the current move and check if it's a win."""
+        row, col = move.row, move.col
+        self._current_moves[row][col] = move
+        for combo in self._winning_combos:
+            results = set(self._current_moves[n][m].label for n, m in combo)
+            is_win = (len(results) == 1) and ("" not in results)
+            if is_win:
+                self._has_winner = True
+                self.winner_combo = combo
+                break
 
-def minimax(board, depth, is_maximizing):
-    if check_win(2):
-        return -10 + depth
-    if check_win(1):
-        return 10 - depth
-    if is_board_full():
-        return 0
+    def has_winner(self):
+        """Return True if the game has a winner, and False otherwise."""
+        return self._has_winner
 
-    if is_maximizing:
-        best_score = -np.inf
-        for row in range(BOARD_ROWS):
-            for col in range(BOARD_COLS):
-                if available_square(row, col):
-                    mark_square(row, col, 1)
-                    score = minimax(board, depth + 1, False)
-                    board[row][col] = 0
-                    best_score = max(score, best_score)
-        return best_score
-    else:
-        best_score = np.inf
-        for row in range(BOARD_ROWS):
-            for col in range(BOARD_COLS):
-                if available_square(row, col):
-                    mark_square(row, col, 2)
-                    score = minimax(board, depth + 1, True)
-                    board[row][col] = 0
-                    best_score = min(score, best_score)
-        return best_score
+    def is_tied(self):
+        """Return True if the game is tied, and False otherwise."""
+        no_winner = not self._has_winner
+        played_moves = (
+            move.label for row in self._current_moves for move in row
+        )
+        return no_winner and all(played_moves)
 
-def best_move():
-    best_score = -np.inf
-    move = (-1, -1)
-    for row in range(BOARD_ROWS):
-        for col in range(BOARD_COLS):
-            if available_square(row, col):
-                mark_square(row, col, 1)
-                score = minimax(board, 0, False)
-                board[row][col] = 0
-                if score > best_score:
-                    best_score = score
-                    move = (row, col)
-    return move
+    def reset_game(self):
+        """Reset the game state to play again."""
+        for row, row_content in enumerate(self._current_moves):
+            for col, _ in enumerate(row_content):
+                row_content[col] = Move(row, col)
+        self._has_winner = False
+        self.winner_combo = []
 
-# Main loop
-draw_lines()
-player = 2  # Player 1 starts
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mouseX = event.pos[0]
-            mouseY = event.pos[1]
-            clicked_row = mouseY // SQUARE_SIZE
-            clicked_col = mouseX // SQUARE_SIZE
-            if available_square(clicked_row, clicked_col):
-                mark_square(clicked_row, clicked_col, player)
-                if check_win(player):
-                    print("Player 2 wins!")
-                player = 1
-                if not is_board_full():
-                    row, col = best_move()
-                    mark_square(row, col, player)
-                    if check_win(player):
-                        print("Player 1 wins!")
-                if is_board_full():
-                    print("It's a tie!")
-            draw_figures()
-    pygame.display.update()
+class TicTacToeBoard(tk.Tk):
+    def __init__(self, game):
+        super().__init__()
+        self.title("Tic-Tac-Toe Game")
+        self._cells = {}
+        self._game = game
+        self._create_menu()
+        self._create_board_display()
+        self._create_board_grid()
+
+    def _create_menu(self):
+        menu_bar = tk.Menu(master=self)
+        self.config(menu=menu_bar)
+        file_menu = tk.Menu(master=menu_bar)
+        file_menu.add_command(label="Play Again", command=self.reset_board)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=quit)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+
+    def _create_board_display(self):
+        display_frame = tk.Frame(master=self)
+        display_frame.pack(fill=tk.X)
+        self.display = tk.Label(
+            master=display_frame,
+            text="Ready?",
+            font=font.Font(size=28, weight="bold"),
+        )
+        self.display.pack()
+
+    def _create_board_grid(self):
+        grid_frame = tk.Frame(master=self)
+        grid_frame.pack()
+        for row in range(self._game.board_size):
+            self.rowconfigure(row, weight=1, minsize=50)
+            self.columnconfigure(row, weight=1, minsize=75)
+            for col in range(self._game.board_size):
+                button = tk.Button(
+                    master=grid_frame,
+                    text="",
+                    font=font.Font(size=36, weight="bold"),
+                    fg="black",
+                    width=3,
+                    height=2,
+                    highlightbackground="lightblue",
+                )
+                self._cells[button] = (row, col)
+                button.bind("<ButtonPress-1>", self.play)
+                button.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+
+    def play(self, event):
+        """Handle a player's move."""
+        clicked_btn = event.widget
+        row, col = self._cells[clicked_btn]
+        move = Move(row, col, self._game.current_player.label)
+        if self._game.is_valid_move(move):
+            self._update_button(clicked_btn)
+            self._game.process_move(move)
+            if self._game.is_tied():
+                self._update_display(msg="Tied game!", color="red")
+            elif self._game.has_winner():
+                self._highlight_cells()
+                msg = f'Player "{self._game.current_player.label}" won!'
+                color = self._game.current_player.color
+                self._update_display(msg, color)
+            else:
+                self._game.toggle_player()
+                msg = f"{self._game.current_player.label}'s turn"
+                self._update_display(msg)
+
+    def _update_button(self, clicked_btn):
+        clicked_btn.config(text=self._game.current_player.label)
+        clicked_btn.config(fg=self._game.current_player.color)
+
+    def _update_display(self, msg, color="black"):
+        self.display["text"] = msg
+        self.display["fg"] = color
+
+    def _highlight_cells(self):
+        for button, coordinates in self._cells.items():
+            if coordinates in self._game.winner_combo:
+                button.config(highlightbackground="red")
+
+    def reset_board(self):
+        """Reset the game's board to play again."""
+        self._game.reset_game()
+        self._update_display(msg="Ready?")
+        for button in self._cells.keys():
+            button.config(highlightbackground="lightblue")
+            button.config(text="")
+            button.config(fg="black")
+
+def main():
+    """Create the game's board and run its main loop."""
+    game = TicTacToeGame()
+    board = TicTacToeBoard(game)
+    board.mainloop()
+
+if __name__ == "__main__":
+    main()
