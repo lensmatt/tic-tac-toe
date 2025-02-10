@@ -16,8 +16,8 @@ class Move(NamedTuple):
 
 BOARD_SIZE = 3
 DEFAULT_PLAYERS = (
-    Player(label="X", color="blue"),
-    Player(label="O", color="green"),
+    Player(label="X", color="black"),
+    Player(label="O", color="black"),
 )
 
 class TicTacToeGame:
@@ -124,8 +124,8 @@ class TicTacToeBoard(tk.Tk):
         grid_frame = tk.Frame(master=self)
         grid_frame.pack()
         for row in range(self._game.board_size):
-            self.rowconfigure(row, weight=1, minsize=50)
-            self.columnconfigure(row, weight=1, minsize=75)
+            self.rowconfigure(row, weight=1, minsize=75)
+            self.columnconfigure(row, weight=1, minsize=100)
             for col in range(self._game.board_size):
                 button = tk.Button(
                     master=grid_frame,
