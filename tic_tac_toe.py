@@ -30,6 +30,7 @@ class TicTacToeGame:
         self._has_winner = False
         self._winning_combos = []
         self._setup_board()
+        self.scores = {player.label: 0 for player in players}  # Initialize scores
 
     def _setup_board(self):
         self._current_moves = [
@@ -69,6 +70,7 @@ class TicTacToeGame:
             if is_win:
                 self._has_winner = True
                 self.winner_combo = combo
+                self.scores[self.current_player.label] += 1  # Update score
                 break
 
     def has_winner(self):
@@ -99,6 +101,7 @@ class TicTacToeBoard(tk.Tk):
         self._game = game
         self._create_menu()
         self._create_board_display()
+        self._create_scoreboard()
         self._create_board_grid()
 
     def _create_menu(self):
@@ -107,6 +110,7 @@ class TicTacToeBoard(tk.Tk):
         file_menu = tk.Menu(master=menu_bar)
         file_menu.add_command(label="Play Again", command=self.reset_board)
         file_menu.add_separator()
+        file_menu.add_command(label="Reset Scores", command=self.reset_scores)
         file_menu.add_command(label="Exit", command=quit)
         menu_bar.add_cascade(label="File", menu=file_menu)
 
@@ -120,12 +124,22 @@ class TicTacToeBoard(tk.Tk):
         )
         self.display.pack()
 
+    def _create_scoreboard(self):
+        scoreboard_frame = tk.Frame(master=self)
+        scoreboard_frame.pack(fill=tk.X)
+        self.scoreboard = tk.Label(
+            master=scoreboard_frame,
+            text="Scores: X - 0 | O - 0",
+            font=font.Font(size=20, weight="bold"),
+        )
+        self.scoreboard.pack()
+
     def _create_board_grid(self):
         grid_frame = tk.Frame(master=self)
         grid_frame.pack()
         for row in range(self._game.board_size):
             self.rowconfigure(row, weight=1, minsize=75)
-            self.columnconfigure(row, weight=1, minsize=100)
+            self.columnconfigure(row, weight=1, minsize=200)
             for col in range(self._game.board_size):
                 button = tk.Button(
                     master=grid_frame,
@@ -150,11 +164,13 @@ class TicTacToeBoard(tk.Tk):
             self._game.process_move(move)
             if self._game.is_tied():
                 self._update_display(msg="Tied game!", color="red")
+                self.reset_board()  # Reset the board when the game is tied
             elif self._game.has_winner():
                 self._highlight_cells()
                 msg = f'Player "{self._game.current_player.label}" won!'
                 color = self._game.current_player.color
                 self._update_display(msg, color)
+                self._update_scoreboard()  # Update the scoreboard
             else:
                 self._game.toggle_player()
                 msg = f"{self._game.current_player.label}'s turn"
@@ -167,6 +183,10 @@ class TicTacToeBoard(tk.Tk):
     def _update_display(self, msg, color="black"):
         self.display["text"] = msg
         self.display["fg"] = color
+
+    def _update_scoreboard(self):
+        scores = self._game.scores
+        self.scoreboard["text"] = f"Scores: X - {scores['X']} | O - {scores['O']}"
 
     def _highlight_cells(self):
         for button, coordinates in self._cells.items():
@@ -181,6 +201,11 @@ class TicTacToeBoard(tk.Tk):
             button.config(highlightbackground="lightblue")
             button.config(text="")
             button.config(fg="black")
+
+    def reset_scores(self):
+        """Reset the scores."""
+        self._game.scores = {player.label: 0 for player in self._game._players}
+        self._update_scoreboard()
 
 def main():
     """Create the game's board and run its main loop."""
